@@ -1,0 +1,19 @@
+{
+  "groupHeader": {
+    "messageId": "MSG-0001",
+    "creationDateTime": "2026-01-01T12:00:00Z"
+  },
+  "paymentInformationId": "PMTINF-0001",
+  "transactions": [
+    {
+      "instructionId": "INSTR-0001",
+      "endToEndId": "E2E-0001",
+      "amount": { "value": "100.00", "currency": "EUR" },
+      "debtor": { "name": "Alice Debtor", "agentBic": "DEUTDEFF" },
+      "debtorAccount": { "iban": "DE89370400440532013000", "name": "Alice" },
+      "creditor": { "name": "Bob Creditor", "agentBic": "NDEAFIHH" },
+      "creditorAccount": { "iban": "FI2112345600000785", "name": "Bob" },
+      "remittanceInformation": "Invoice 42"
+    }
+  ]
+}

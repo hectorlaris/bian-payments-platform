@@ -1,0 +1,15 @@
+extends: ["spectral:oas"]
+
+# Ruleset for BIAN-aligned, API-first OpenAPI contracts.
+rules:
+  # Core hygiene
+  operation-operationId: error
+  operation-description: warn
+  operation-tags: warn
+  info-contact: off
+  oas3-api-servers: warn
+
+  # Encourage BIAN/consistency conventions
+  operation-success-response: warn
+  path-declarations-must-exist: error
+  no-$ref-siblings: off

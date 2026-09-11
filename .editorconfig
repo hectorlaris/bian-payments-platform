@@ -1,0 +1,31 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+# Python — PEP 8, 4-space indentation
+[*.py]
+indent_size = 4
+max_line_length = 100
+
+# C# — .NET conventions
+[*.cs]
+indent_size = 4
+
+[*.{csproj,props,targets}]
+indent_size = 2
+
+# Web / config formats
+[*.{json,yml,yaml,tf,tfvars,md}]
+indent_size = 2
+
+[*.{yml,yaml}]
+indent_size = 2
+
+# Makefiles require tabs
+[Makefile]
+indent_style = tab

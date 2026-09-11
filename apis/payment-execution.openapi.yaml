@@ -1,0 +1,127 @@
+openapi: 3.1.0
+info:
+  title: Payment Execution API
+  version: 1.0.0
+  description: >-
+    BIAN Service Domain: Payment Execution. Executes an approved payment order against
+    a payment rail (mock by default, external sandbox behind configuration) and reports
+    status as ISO 20022 pacs.002. BIAN Semantic API verbs: Execute, Retrieve.
+  contact:
+    name: Payments Platform Team
+servers:
+  - url: https://api.example-bank.com/payment-execution/v1
+    description: Controlled environment
+tags:
+  - name: PaymentExecution
+    description: BIAN control record - Payment Execution
+paths:
+  /payment-executions:
+    post:
+      tags: [PaymentExecution]
+      operationId: executePayment
+      summary: Execute a payment (BIAN Execute)
+      description: >-
+        Execute a payment order against the rail. Idempotent by paymentId: repeating
+        with the same paymentId returns the existing execution rather than duplicating.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Idempotency key; must equal the paymentId.
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutionRequest'
+      responses:
+        '200':
+          description: Execution already existed (idempotent replay).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionState'
+        '201':
+          description: Execution created and attempted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionState'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: './components/iso20022.yaml#/components/schemas/Problem'
+      security:
+        - oauth2: [payments.execute]
+  /payment-executions/{paymentId}:
+    get:
+      tags: [PaymentExecution]
+      operationId: retrievePaymentExecution
+      summary: Retrieve execution status (BIAN Retrieve)
+      description: Return the execution control record including the pacs.002 status.
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          description: The payment aggregate id.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The execution control record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionState'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: './components/iso20022.yaml#/components/schemas/Problem'
+      security:
+        - oauth2: [payments.read]
+components:
+  schemas:
+    ExecutionRequest:
+      type: object
+      description: Request to execute a payment order.
+      required: [paymentId, pacs008]
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        pacs008:
+          $ref: './components/iso20022.yaml#/components/schemas/Pacs008'
+    ExecutionState:
+      type: object
+      description: The Payment Execution control record.
+      required: [paymentId, status]
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        status:
+          $ref: './components/iso20022.yaml#/components/schemas/TransactionStatus'
+        pacs002:
+          $ref: './components/iso20022.yaml#/components/schemas/Pacs002'
+        rail:
+          type: string
+          description: The rail used (mock or sandbox).
+          enum: [mock, sandbox]
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: OAuth2 / OIDC via Cognito.
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.example-bank.com/oauth2/token
+          scopes:
+            payments.execute: Execute payments
+            payments.read: Read payment state

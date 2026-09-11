@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars.local
+.terraform.lock.hcl
+
+# Node (tooling: Spectral, etc.)
+node_modules/
+
+# IDE / OS
+.idea/
+.DS_Store
+Thumbs.db
+
+# Office temp files
+~$*.docx
+# Local working notes (not part of the published project)
+docs_1/

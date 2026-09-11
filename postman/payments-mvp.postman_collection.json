@@ -1,0 +1,223 @@
+{
+  "info": {
+    "name": "Payments MVP - Payment Initiation",
+    "description": "End-to-end and negative-path requests for the BIAN Payment Initiation Service Domain (ISO 20022 pain.001). Import an environment (local or AWS) alongside this collection.\n\nThe happy-path 'Initiate payment' request saves the returned paymentId into a collection variable so 'Get status' can reuse it automatically.\n\nAuth: requests send `Authorization: Bearer {{accessToken}}`. See the 'Auth' folder for how to obtain a token (local dev vs Cognito).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "paymentId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "How to obtain an access token. Set the result into the environment variable `accessToken`.",
+      "item": [
+        {
+          "name": "Get token (Cognito - client credentials)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Runs against a real Cognito user pool (see the AWS environment).",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.access_token) {",
+                  "        pm.environment.set('accessToken', json.access_token);",
+                  "        pm.test('access_token captured', () => pm.expect(json.access_token).to.be.a('string'));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" },
+              {
+                "key": "Authorization",
+                "value": "Basic {{cognitoBasicAuth}}",
+                "description": "Base64 of clientId:clientSecret. Compute once and store in the environment."
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "client_credentials" },
+                { "key": "scope", "value": "{{tokenScope}}" }
+              ]
+            },
+            "url": {
+              "raw": "{{tokenUrl}}",
+              "host": ["{{tokenUrl}}"]
+            },
+            "description": "Cognito token endpoint (client-credentials / machine-to-machine). Only used with the AWS environment. For local dev, generate a token with `python scripts/make_token.py \"payments.initiate payments.read\"` and paste it into the environment's `accessToken` variable."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Initiate payment (pain.001) - happy path",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 201 Created', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.test('status is ACTC', () => pm.expect(body.status).to.eql('ACTC'));",
+              "pm.test('paymentId present', () => pm.expect(body.paymentId).to.be.a('string'));",
+              "pm.collectionVariables.set('paymentId', body.paymentId);",
+              "console.log('Captured paymentId =', body.paymentId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"groupHeader\": {\n    \"messageId\": \"MSG-DEMO-1\",\n    \"creationDateTime\": \"2026-09-03T10:00:00Z\"\n  },\n  \"paymentInformationId\": \"PMTINF-DEMO-1\",\n  \"transactions\": [\n    {\n      \"endToEndId\": \"E2E-DEMO-1\",\n      \"amount\": { \"value\": \"250.00\", \"currency\": \"EUR\" },\n      \"debtor\": { \"name\": \"Ana Pagadora\", \"agentBic\": \"DEUTDEFF\" },\n      \"debtorAccount\": { \"iban\": \"DE89370400440532013000\", \"name\": \"Ana\" },\n      \"creditor\": { \"name\": \"Beto Receptor\", \"agentBic\": \"NDEAFIHH\" },\n      \"creditorAccount\": { \"iban\": \"FI2112345600000785\", \"name\": \"Beto\" },\n      \"remittanceInformation\": \"Factura 1001\"\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/payment-initiations",
+          "host": ["{{baseUrl}}"],
+          "path": ["payment-initiations"]
+        },
+        "description": "BIAN Initiate. Sends an ISO 20022 pain.001 and starts the payment lifecycle. Requires the `payments.initiate` scope."
+      }
+    },
+    {
+      "name": "Get payment status - happy path",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('paymentId matches', () => pm.expect(body.paymentId).to.eql(pm.collectionVariables.get('paymentId')));",
+              "pm.test('status is a known ISO code', () => pm.expect(['ACTC','ACSP','ACSC','RJCT']).to.include(body.status));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/payment-initiations/{{paymentId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["payment-initiations", "{{paymentId}}", "status"]
+        },
+        "description": "BIAN Retrieve (status behavior qualifier). Reads from the CQRS projection. Requires the `payments.read` scope."
+      }
+    },
+    {
+      "name": "Negative - missing token (401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 401 Unauthorized', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"groupHeader\": { \"messageId\": \"MSG-X\", \"creationDateTime\": \"2026-09-03T10:00:00Z\" },\n  \"paymentInformationId\": \"P-X\",\n  \"transactions\": [\n    {\n      \"endToEndId\": \"E2E-X\",\n      \"amount\": { \"value\": \"1.00\", \"currency\": \"EUR\" },\n      \"debtor\": { \"name\": \"A\" },\n      \"debtorAccount\": { \"iban\": \"DE89370400440532013000\" },\n      \"creditor\": { \"name\": \"B\" },\n      \"creditorAccount\": { \"iban\": \"FI2112345600000785\" }\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/payment-initiations",
+          "host": ["{{baseUrl}}"],
+          "path": ["payment-initiations"]
+        },
+        "description": "No Authorization header -> the security layer rejects before any business logic runs."
+      }
+    },
+    {
+      "name": "Negative - wrong scope (403)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 403 Forbidden', () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{readOnlyToken}}", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"groupHeader\": { \"messageId\": \"MSG-X\", \"creationDateTime\": \"2026-09-03T10:00:00Z\" },\n  \"paymentInformationId\": \"P-X\",\n  \"transactions\": [\n    {\n      \"endToEndId\": \"E2E-X\",\n      \"amount\": { \"value\": \"1.00\", \"currency\": \"EUR\" },\n      \"debtor\": { \"name\": \"A\" },\n      \"debtorAccount\": { \"iban\": \"DE89370400440532013000\" },\n      \"creditor\": { \"name\": \"B\" },\n      \"creditorAccount\": { \"iban\": \"FI2112345600000785\" }\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/payment-initiations",
+          "host": ["{{baseUrl}}"],
+          "path": ["payment-initiations"]
+        },
+        "description": "A token with only `payments.read` cannot initiate. Set `readOnlyToken` in the environment: `python scripts/make_token.py \"payments.read\"`."
+      }
+    },
+    {
+      "name": "Negative - invalid currency (400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 400 Bad Request', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"groupHeader\": { \"messageId\": \"MSG-BAD\", \"creationDateTime\": \"2026-09-03T10:00:00Z\" },\n  \"paymentInformationId\": \"P-BAD\",\n  \"transactions\": [\n    {\n      \"endToEndId\": \"E2E-BAD\",\n      \"amount\": { \"value\": \"10.00\", \"currency\": \"euro\" },\n      \"debtor\": { \"name\": \"A\" },\n      \"debtorAccount\": { \"iban\": \"DE89370400440532013000\" },\n      \"creditor\": { \"name\": \"B\" },\n      \"creditorAccount\": { \"iban\": \"FI2112345600000785\" }\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/payment-initiations",
+          "host": ["{{baseUrl}}"],
+          "path": ["payment-initiations"]
+        },
+        "description": "Currency 'euro' violates the ISO 4217 pattern (3 uppercase letters). The ISO 20022 domain validation returns 400 (vs 422 for structural/type errors)."
+      }
+    }
+  ]
+}

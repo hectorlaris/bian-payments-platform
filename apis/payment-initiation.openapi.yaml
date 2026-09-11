@@ -1,0 +1,146 @@
+openapi: 3.1.0
+info:
+  title: Payment Initiation API
+  version: 1.0.0
+  description: >-
+    Payment Initiation (design partition — the customer-facing channel of the official
+    BIAN Payment Order Service Domain, not a distinct SD). Captures a customer's payment
+    intent as ISO 20022 pain.001, validates it, and starts the payment flow. Follows BIAN
+    Semantic API conventions (Initiate, Retrieve).
+  contact:
+    name: Payments Platform Team
+servers:
+  - url: https://api.example-bank.com/payment-initiation/v1
+    description: Controlled environment
+tags:
+  - name: PaymentInitiation
+    description: >-
+      Control record for our Payment Initiation bounded context. Payment Initiation is a
+      design partition (the customer-facing channel), not a distinct BIAN Service Domain;
+      it fronts the official BIAN Payment Order SD. See docs/architecture/bian-iso20022-mapping.md.
+paths:
+  /payment-initiations:
+    post:
+      tags: [PaymentInitiation]
+      operationId: initiatePaymentInitiation
+      summary: Initiate a payment (BIAN Initiate)
+      description: Accept an ISO 20022 pain.001 and start the payment lifecycle.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './components/iso20022.yaml#/components/schemas/Pain001'
+      responses:
+        '201':
+          description: Payment initiation accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInitiationState'
+        '400':
+          description: Validation failed.
+          content:
+            application/json:
+              schema:
+                $ref: './components/iso20022.yaml#/components/schemas/Problem'
+      security:
+        - oauth2: [payments.initiate]
+  /payment-initiations/{initiationId}:
+    get:
+      tags: [PaymentInitiation]
+      operationId: retrievePaymentInitiation
+      summary: Retrieve a payment initiation (BIAN Retrieve)
+      description: Return the current view of a payment initiation control record.
+      parameters:
+        - $ref: '#/components/parameters/InitiationId'
+      responses:
+        '200':
+          description: The payment initiation control record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInitiationState'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: './components/iso20022.yaml#/components/schemas/Problem'
+      security:
+        - oauth2: [payments.read]
+  /payment-initiations/{initiationId}/status:
+    get:
+      tags: [PaymentInitiation]
+      operationId: retrievePaymentInitiationStatus
+      summary: Retrieve payment status (BIAN Retrieve - behavior qualifier)
+      description: Return the current lifecycle status from the read projection.
+      parameters:
+        - $ref: '#/components/parameters/InitiationId'
+      responses:
+        '200':
+          description: Current status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentStatusView'
+        '404':
+          description: Not found.
+          content:
+            application/json:
+              schema:
+                $ref: './components/iso20022.yaml#/components/schemas/Problem'
+      security:
+        - oauth2: [payments.read]
+components:
+  parameters:
+    InitiationId:
+      name: initiationId
+      in: path
+      required: true
+      description: The payment initiation control record id.
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    PaymentInitiationState:
+      type: object
+      description: The Payment Initiation control record view.
+      required: [initiationId, paymentId, status]
+      properties:
+        initiationId:
+          type: string
+          format: uuid
+        paymentId:
+          type: string
+          format: uuid
+          description: Aggregate id; the idempotency key across the flow.
+        status:
+          $ref: './components/iso20022.yaml#/components/schemas/TransactionStatus'
+        endToEndId:
+          type: string
+    PaymentStatusView:
+      type: object
+      description: Read-model projection of the current payment status.
+      required: [paymentId, status]
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        status:
+          $ref: './components/iso20022.yaml#/components/schemas/TransactionStatus'
+        reasonCode:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: OAuth2 / OIDC via Cognito.
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.example-bank.com/oauth2/token
+          scopes:
+            payments.initiate: Initiate payments
+            payments.read: Read payment state

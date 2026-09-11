@@ -1,0 +1,41 @@
+[tool.ruff]
+# Enforce the project Python standards across all Python services.
+line-length = 100
+target-version = "py312"
+indent-width = 4
+
+[tool.ruff.lint]
+# pycodestyle (E, W), pyflakes (F), isort (I), pydocstyle (D), pyupgrade (UP),
+# flake8-bugbear (B). Docstrings and modern syntax (f-strings) are enforced.
+select = ["E", "W", "F", "I", "D", "UP", "B"]
+ignore = [
+    "D203",  # one-blank-line-before-class (conflicts with D211)
+    "D213",  # multi-line-summary-second-line (conflicts with D212)
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+# Treat our own packages as first-party so import grouping is stable.
+known-first-party = ["iso20022", "payment_initiation", "rail_adapter", "payments_integration"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom uses Depends()/Query()/etc. in defaults.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Header"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["services"]

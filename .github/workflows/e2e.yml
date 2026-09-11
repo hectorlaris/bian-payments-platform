@@ -1,0 +1,28 @@
+name: End-to-End
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packages
+        run: |
+          python -m pip install -e services/shared/iso20022_python
+          python -m pip install -e services/payment-initiation
+          python -m pip install -e services/payment-execution/rail-adapter
+          python -m pip install -e services/integration
+
+      - name: Run end-to-end smoke test
+        run: python scripts/e2e_smoke.py

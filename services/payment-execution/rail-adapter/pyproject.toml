@@ -1,0 +1,20 @@
+[project]
+name = "rail-adapter"
+version = "1.0.0"
+description = "Payment rail adapter (mock by default, external sandbox behind config)."
+requires-python = ">=3.12"
+dependencies = [
+    "iso20022",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

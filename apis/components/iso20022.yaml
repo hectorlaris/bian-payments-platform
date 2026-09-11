@@ -1,0 +1,166 @@
+# Reusable ISO 20022 schema components (MVP subset).
+# Referenced by the three BIAN Service Domain contracts. These model the fields
+# required for a credit-transfer happy path plus status reporting. They are a
+# pragmatic subset, not the full ISO 20022 schema.
+openapi: 3.1.0
+info:
+  title: ISO 20022 shared components
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Amount:
+      type: object
+      description: An amount of money with an ISO 4217 currency.
+      required: [value, currency]
+      properties:
+        value:
+          type: string
+          description: Decimal amount as a string to avoid float precision loss.
+          pattern: '^\d{1,15}(\.\d{1,5})?$'
+          examples: ["100.00"]
+        currency:
+          type: string
+          description: ISO 4217 currency code.
+          pattern: '^[A-Z]{3}$'
+          examples: ["EUR"]
+
+    Account:
+      type: object
+      description: A cash account identified by IBAN.
+      required: [iban]
+      properties:
+        iban:
+          type: string
+          pattern: '^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$'
+          examples: ["DE89370400440532013000"]
+        name:
+          type: string
+          maxLength: 140
+
+    Party:
+      type: object
+      description: A debtor or creditor party.
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 140
+        agentBic:
+          type: string
+          description: BIC of the party's financial institution.
+          pattern: '^[A-Z0-9]{8}([A-Z0-9]{3})?$'
+          examples: ["DEUTDEFF"]
+
+    GroupHeader:
+      type: object
+      description: ISO 20022 group header (GrpHdr).
+      required: [messageId, creationDateTime]
+      properties:
+        messageId:
+          type: string
+          maxLength: 35
+        creationDateTime:
+          type: string
+          format: date-time
+
+    CreditTransferTransaction:
+      type: object
+      description: A single credit transfer instruction.
+      required: [endToEndId, amount, debtor, debtorAccount, creditor, creditorAccount]
+      properties:
+        instructionId:
+          type: string
+          maxLength: 35
+        endToEndId:
+          type: string
+          description: End-to-end reference preserved across the whole flow.
+          maxLength: 35
+        amount:
+          $ref: '#/components/schemas/Amount'
+        debtor:
+          $ref: '#/components/schemas/Party'
+        debtorAccount:
+          $ref: '#/components/schemas/Account'
+        creditor:
+          $ref: '#/components/schemas/Party'
+        creditorAccount:
+          $ref: '#/components/schemas/Account'
+        remittanceInformation:
+          type: string
+          maxLength: 140
+
+    # pain.001 CustomerCreditTransferInitiation (initiation input).
+    Pain001:
+      type: object
+      description: ISO 20022 pain.001 CustomerCreditTransferInitiation (MVP subset).
+      required: [groupHeader, paymentInformationId, transactions]
+      properties:
+        groupHeader:
+          $ref: '#/components/schemas/GroupHeader'
+        paymentInformationId:
+          type: string
+          maxLength: 35
+        transactions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CreditTransferTransaction'
+
+    # pacs.008 FIToFICustomerCreditTransfer (interbank).
+    Pacs008:
+      type: object
+      description: ISO 20022 pacs.008 FIToFICustomerCreditTransfer (MVP subset).
+      required: [groupHeader, transactions]
+      properties:
+        groupHeader:
+          $ref: '#/components/schemas/GroupHeader'
+        transactions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CreditTransferTransaction'
+
+    # pacs.002 FIToFIPaymentStatusReport (status).
+    Pacs002:
+      type: object
+      description: ISO 20022 pacs.002 FIToFIPaymentStatusReport (MVP subset).
+      required: [groupHeader, originalMessageId, transactionStatus]
+      properties:
+        groupHeader:
+          $ref: '#/components/schemas/GroupHeader'
+        originalMessageId:
+          type: string
+          maxLength: 35
+        originalEndToEndId:
+          type: string
+          maxLength: 35
+        transactionStatus:
+          $ref: '#/components/schemas/TransactionStatus'
+        statusReasonCode:
+          type: string
+          description: ISO 20022 reason code when rejected.
+          examples: ["AM04"]
+
+    TransactionStatus:
+      type: string
+      description: >-
+        ISO 20022 transaction status (subset): ACTC accepted technical validation,
+        ACSP accepted settlement in process, ACSC accepted settlement completed,
+        RJCT rejected.
+      enum: [ACTC, ACSP, ACSC, RJCT]
+
+    Problem:
+      type: object
+      description: RFC 9457 problem details for error responses.
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
