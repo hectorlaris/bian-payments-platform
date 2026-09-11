@@ -8,8 +8,11 @@ terraform {
     }
   }
 
-  # Remote state backend (configured per environment out-of-band).
-  # backend "s3" {}
+  # Remote state backend. Values are supplied at init time via -backend-config
+  # (see infra/README.md), so this block stays free of environment-specific values.
+  backend "s3" {
+    key = "payments/dev/terraform.tfstate"
+  }
 }
 
 provider "aws" {

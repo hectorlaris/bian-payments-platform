@@ -25,6 +25,9 @@ TestResults/
 crash.log
 *.tfvars.local
 .terraform.lock.hcl
+# Environment-specific values (keep the *.example templates, ignore the real files)
+terraform.tfvars
+backend.hcl
 
 # Node (tooling: Spectral, etc.)
 node_modules/

@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars and adjust. The bucket name MUST be globally unique.
+# Suggestion: append your AWS account id or a random suffix.
+
+aws_region        = "us-east-1"
+github_owner      = "hectorlaris"
+github_repo       = "bian-payments-platform"
+state_bucket_name = "payments-tfstate-CHANGE-ME-123456789012"
+lock_table_name   = "payments-tf-locks"

@@ -1,0 +1,8 @@
+# Backend configuration for `terraform init -backend-config=backend.hcl`.
+# Copy to backend.hcl and fill in the values from the bootstrap outputs.
+# (The `key` is already set in providers.tf and must not be repeated here.)
+
+bucket         = "payments-tfstate-CHANGE-ME-123456789012"
+region         = "us-east-1"
+dynamodb_table = "payments-tf-locks"
+encrypt        = true
